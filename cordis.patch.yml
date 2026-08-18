@@ -1,0 +1,5 @@
+# dsh-ledger bundle patch
+# 插入 host 插件行：只读记账仪表盘（解析 beancount 账本 → RPC → web Tab）。
+- insert:
+    - id: dsh-ledger
+      name: dsh-ledger
