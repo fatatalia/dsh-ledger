@@ -177,7 +177,7 @@ window.__ModuleLoader__.load({
             ] }),
 
             // ── 右栏（最近交易，固定宽度可滚动）──
-            S.jsxs("div", { style: { flex: "0 0 380px", ...card, maxHeight: 560, overflowY: "auto" }, children: [
+            S.jsxs("div", { style: { flex: "0 0 440px", ...card, maxHeight: 560, overflowY: "auto" }, children: [
               S.jsx("div", { style: title, children: "最近交易" }),
               !monthly || monthly.transactions.length === 0 ? S.jsx("div", { style: empty, children: "本月暂无交易。" }) :
                 monthly.transactions.map((t, i) => {
