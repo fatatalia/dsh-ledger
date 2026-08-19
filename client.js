@@ -97,7 +97,7 @@ window.__ModuleLoader__.load({
       const restAmount = monthly ? monthly.categories.slice(5).reduce((s, c) => s + c.amount, 0) : 0;
 
       return S.jsxs("div", {
-        style: { maxWidth: 1240, padding: "24px 20px", fontFamily: "var(--dsw-font-family,system-ui)", color: "var(--dsw-alias-label-primary)" },
+        style: { width: "100%", maxWidth: 1600, margin: "0 auto", padding: "24px 20px", fontFamily: "var(--dsw-font-family,system-ui)", color: "var(--dsw-alias-label-primary)" },
         children: [
           S.jsxs("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }, children: [
             S.jsx("span", { style: { fontSize: 17, fontWeight: 700 }, children: "📒 记账" }),
