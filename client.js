@@ -206,7 +206,60 @@ window.__ModuleLoader__.load({
       });
     }
 
-    const inject = ["slots", "connection"];
+    const identity = (value) => value;
+    const codec = (symbol) => ({ mode: "strict", typeSymbol: symbol, schema: { parse: identity } });
+
+    const CONTRIBUTION = {
+      package: "dsh-ledger",
+      descriptors: [
+        { id: "dsh-ledger#ledger/getConfig", service: "ledger", namespace: "ledger", method: "getConfig", invocation: { kind: "direct" }, parameters: [], result: codec("dsh-ledger#LedgerConfig") },
+        { id: "dsh-ledger#ledger/setConfig", service: "ledger", namespace: "ledger", method: "setConfig", invocation: { kind: "direct" }, parameters: [{ name: "payload", wire: "payload", source: "json", codec: codec("dsh-ledger#SetPayload") }], result: codec("dsh-ledger#SetResult") },
+      ],
+    };
+
+    /** 设置页：记账配置（账本目录）。 */
+    function LedgerSettingsSection(props) {
+      const { getConfig, setConfig } = props;
+      const [cfg, setCfg] = React.useState(null);
+      const [loading, setLoading] = React.useState(true);
+      const [error, setError] = React.useState(false);
+      const [saved, setSaved] = React.useState(false);
+
+      React.useEffect(() => {
+        let current = true;
+        Promise.resolve().then(() => getConfig()).then((c) => {
+          if (!current) return;
+          setCfg(c || {});
+          setLoading(false);
+        }, () => { if (current) { setLoading(false); setError(true); } });
+        return () => { current = false; };
+      }, [getConfig]);
+
+      if (loading) return S.jsx("p", { style: { color: "var(--dsw-alias-label-tertiary)" }, children: "正在读取记账配置…" });
+      if (error || !cfg) return S.jsxs("div", { children: [
+        S.jsx("p", { style: { color: "var(--dsw-alias-state-error-primary)" }, children: "读取配置失败" }),
+        S.jsx("button", { onClick: () => { setError(false); setLoading(true); setCfg(null); }, children: "重试" }),
+      ] });
+
+      const save = () => {
+        Promise.resolve().then(() => setConfig({ beancountDir: cfg.beancountDir })).then(() => { setSaved(true); setTimeout(() => setSaved(false), 1500); }).catch((e) => console.error("ledger save failed", e));
+      };
+
+      return S.jsxs("div", { style: { maxWidth: 720, fontFamily: "inherit", fontSize: 14, lineHeight: 1.6 }, children: [
+        S.jsx("p", { style: { color: "var(--dsw-alias-label-secondary)", margin: "0 0 12px" },
+          children: "记账：只读仪表盘（会话页「记账」Tab）。数据源为 Beancount 账本（官方 beancount.loader 解析，含 include 的全部账本文件）。修改账本目录后保存即热生效，无需重启。" }),
+        S.jsxs("div", { style: { margin: "6px 0", display: "flex", alignItems: "center", gap: 10 }, children: [
+          S.jsx("label", { style: { flex: "0 0 110px", fontWeight: 500, fontSize: 13 }, children: "账本目录" }),
+          S.jsx("input", { value: cfg.beancountDir ?? "", onChange: (e) => setCfg((c) => ({ ...c, beancountDir: e.target.value })), style: { flex: 1, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--dsw-alias-divider, #ddd)", fontSize: 13 }, placeholder: "/Users/<you>/Beancount" }),
+        ] }),
+        S.jsx("p", { style: { margin: "2px 0 10px 120px", color: "var(--dsw-alias-label-tertiary)", fontSize: 12 }, children: "main.bean 所在目录（账本根目录）。" }),
+        S.jsxs("div", { style: { display: "flex", gap: 8 }, children: [
+          S.jsx("button", { type: "button", onClick: save, style: { padding: "6px 14px", borderRadius: 8, fontWeight: 500, cursor: "pointer" }, children: saved ? "✓ 已保存（热生效）" : "保存" }),
+        ] }),
+      ] });
+    }
+
+    const inject = ["slots", "connection", "remote"];
 
     function apply(ctx) {
       // 记账 Tab（conversation.view，与梦境并排）。
@@ -231,6 +284,22 @@ window.__ModuleLoader__.load({
           LedgerView,
         ),
       );
+
+      // 设置页：记账配置（账本目录）。
+      const mount = ctx.remote.$mount(CONTRIBUTION);
+      const callRemote = async (method, ...args) => {
+        await mount;
+        const remote = ctx.get("remote.ledger");
+        const result = await remote[method](...args);
+        if (!result || !result.ok) throw new Error(`ledger.${method} failed`);
+        return result.value;
+      };
+      const getConfig = () => callRemote("getConfig");
+      const setConfig = (payload) => callRemote("setConfig", payload);
+      ctx.slots.inject("settings.section", () => ctx.slots.register(
+        { name: "settings.section", id: "ledger", order: 27, label: () => "记账", inject: () => ({ getConfig, setConfig }) },
+        LedgerSettingsSection,
+      ));
     }
 
     exports.apply = apply;
