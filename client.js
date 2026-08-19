@@ -181,19 +181,21 @@ window.__ModuleLoader__.load({
               S.jsx("div", { style: title, children: "最近交易" }),
               !monthly || monthly.transactions.length === 0 ? S.jsx("div", { style: empty, children: "本月暂无交易。" }) :
                 monthly.transactions.map((t, i) => {
-                  const exp = t.postings.find((p) => p.account.startsWith("Expenses:"));
-                  const inc = t.postings.find((p) => p.account.startsWith("Income:"));
-                  const isExpense = !!exp;
-                  const amount = isExpense ? exp.amount : (inc ? Math.abs(inc.amount) : 0);
-                  const account = isExpense ? exp.account : (inc ? inc.account : "");
+                  // type/amount 由引擎算好：expense（-¥）/ income（+¥）/ transfer（带符号）
+                  const isExpense = t.type === "expense";
+                  const sign = isExpense ? "-" : (t.amount < 0 ? "-" : "+");
+                  const amount = Math.abs(t.amount);
+                  const color = isExpense ? "var(--dsw-alias-state-error-primary, #e5484d)"
+                    : t.type === "transfer" ? "var(--dsw-alias-label-secondary)"
+                      : "var(--dsw-alias-state-success-primary, #30a46c)";
                   const last = i === monthly.transactions.length - 1;
                   return S.jsxs("div", { key: `${t.date}-${i}`, style: last ? rowLast : row, children: [
                     S.jsx("span", { style: txMeta, children: t.date.slice(5) }),
                     S.jsxs("span", { style: { flex: "0 0 60px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--dsw-alias-label-tertiary)", fontSize: 11, marginRight: 6 }, children: [
-                      (account || "").replace("Expenses:", "").replace("Income:", "").split(":")[0],
+                      (t.account || "").replace("Expenses:", "").replace("Income:", "").split(":")[0],
                     ] }),
                     S.jsx("span", { style: txDesc, title: t.description, children: t.description }),
-                    S.jsx("span", { style: { fontWeight: 600, color: isExpense ? "var(--dsw-alias-state-error-primary, #e5484d)" : "var(--dsw-alias-state-success-primary, #30a46c)" }, children: `${isExpense ? "-" : "+"}¥${fmt(amount)}` }),
+                    S.jsx("span", { style: { fontWeight: 600, color }, children: `${sign}¥${fmt(amount)}` }),
                   ] });
                 }),
             ] }),
