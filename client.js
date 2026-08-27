@@ -170,10 +170,12 @@ window.__ModuleLoader__.load({
                           S.jsx("span", { style: { fontWeight: 600 }, children: `¥${fmt(g.amount)}` }),
                         ],
                       }),
-                      // 展开明细：每个账户一行（银行映射 + 尾号/子账户名）
+                      // 展开明细：每个账户一行（分组映射名 + 最后一段具体名/尾号）
                       isOpen && g.accounts.map((a) => {
                         const parts = a.account.split(":");
-                        const label = `${GROUP_LABELS[parts[1]] || parts[1]}${parts[2] ? ` ${parts[2]}` : ""}`;
+                        const groupLabel = GROUP_LABELS[parts[1]] || parts[1];
+                        const leaf = parts[parts.length - 1];
+                        const label = `${groupLabel} ${leaf}`.trim();
                         return S.jsx("div", {
                           key: a.account,
                           style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0 4px 20px", fontSize: 12, color: "var(--dsw-alias-label-secondary)" },
