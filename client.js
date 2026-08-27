@@ -72,6 +72,8 @@ window.__ModuleLoader__.load({
       const [error, setError] = React.useState("");
       const [busy, setBusy] = React.useState(false);
       const [tick, setTick] = React.useState(0);
+      // 资产结构展开状态：默认折叠，多组可同时展开；刷新/重进 Tab 后重置
+      const [expanded, setExpanded] = React.useState(() => new Set());
 
       // 进入 Tab 自动刷新一次；手工刷新按钮触发 tick。
       React.useEffect(() => {
@@ -140,7 +142,7 @@ window.__ModuleLoader__.load({
                 ] }),
               ] }),
 
-              // 资产结构（动态分组，来自账本自动发现）
+              // 资产结构（动态分组，来自账本自动发现；多账户分组可展开看账户明细，默认折叠）
               summary && summary.groups.length > 0 && S.jsxs("div", { style: card, children: [
                 S.jsx("div", { style: title, children: "资产结构" }),
                 S.jsxs("div", { children: [
@@ -148,9 +150,36 @@ window.__ModuleLoader__.load({
                   S.jsx("div", { style: row, children: [S.jsx("span", { children: "活期（可直接动用）" }), S.jsx("span", { style: { fontWeight: 600 }, children: `¥${fmt(summary.liquid)}` })] }),
                   ...summary.groups.map((g, i) => {
                     const last = i === summary.groups.length - 1;
-                    return S.jsx("div", { key: g.name, style: last ? rowLast : row, children: [
-                      S.jsx("span", { children: `${GROUP_LABELS[g.name] || g.name}${g.accountCount > 1 ? `（${g.accountCount} 个账户）` : ""}` }),
-                      S.jsx("span", { style: { fontWeight: 600 }, children: `¥${fmt(g.amount)}` }),
+                    const expandable = g.accountCount > 1; // 单账户分组无可展开内容，不显示箭头
+                    const isOpen = expanded.has(g.name);
+                    const toggle = () => setExpanded((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(g.name)) next.delete(g.name);
+                      else next.add(g.name);
+                      return next;
+                    });
+                    return S.jsxs("div", { key: g.name, children: [
+                      S.jsx("div", {
+                        style: { ...(last ? rowLast : row), cursor: expandable ? "pointer" : "default", userSelect: "none" },
+                        onClick: expandable ? toggle : undefined,
+                        children: [
+                          S.jsx("span", { children: [
+                            expandable ? S.jsx("span", { style: { display: "inline-block", width: 16, color: "var(--dsw-alias-label-tertiary)", fontSize: 11 }, children: isOpen ? "▾" : "▸" }) : S.jsx("span", { style: { display: "inline-block", width: 16 }, children: "" }),
+                            S.jsx("span", { children: `${GROUP_LABELS[g.name] || g.name}${g.accountCount > 1 ? `（${g.accountCount} 个账户）` : ""}` }),
+                          ] }),
+                          S.jsx("span", { style: { fontWeight: 600 }, children: `¥${fmt(g.amount)}` }),
+                        ],
+                      }),
+                      // 展开明细：每个账户一行（银行映射 + 尾号/子账户名）
+                      isOpen && g.accounts.map((a) => {
+                        const parts = a.account.split(":");
+                        const label = `${GROUP_LABELS[parts[1]] || parts[1]}${parts[2] ? ` ${parts[2]}` : ""}`;
+                        return S.jsx("div", {
+                          key: a.account,
+                          style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0 4px 20px", fontSize: 12, color: "var(--dsw-alias-label-secondary)" },
+                          children: [S.jsx("span", { children: label }), S.jsx("span", { children: `¥${fmt(a.amount)}` })],
+                        });
+                      }),
                     ] });
                   }),
                 ] }),
