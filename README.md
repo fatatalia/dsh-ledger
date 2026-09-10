@@ -38,6 +38,7 @@ dsh-ledger/
 
 - **依赖软链必须建**：`node_modules/@deepseek-ai` → `/usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai`，否则 `ERR_MODULE_NOT_FOUND: Cannot find package '@deepseek-ai/schemastery'` 导致整个 profile 起不来
 - **inject 必须包含用到的服务**：index.js 用了 `ctx.typert`，inject 列表需含 `"typert"`（曾漏掉）
+- **inject 需含 `"webServer"`**（dsh 0.1.5 起严格检查）：漏了报 `cannot get property "webServer" without inject`，整个 profile 起不来（2026-09-10 踩过）
 - **中文账户名**：账本里有 `Assets:TimeDeposit:享定存70007` 等中文账户，正则需允许 `\u4e00-\u9fff`，否则几十万资产解析不到
 - 挂载：`~/.dsh/profiles/web/package.json` 的 dependencies（link）+ dsh.profile.bundles 两处
 

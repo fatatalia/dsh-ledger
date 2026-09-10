@@ -14,7 +14,7 @@ import { LedgerEngine } from "./lib/ledger-engine.mjs";
 
 export const name = "dsh-ledger";
 
-export const inject = ["typert", "settings", "connection"];
+export const inject = ["typert", "settings", "connection", "webServer"];
 
 /** `ledger` settings namespace：账本根目录。 */
 const LedgerSchema = z.object({
