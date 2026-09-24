@@ -3,6 +3,13 @@
 在 dsh web 会话页的 **「记账」Tab**（与「梦境」并排）展示 beancount 账本的月度快照：
 本月收支总览、资产结构、支出分类占比、最近交易。**只读**——不在插件里记账，Fava 保留做深度分析。
 
+## dsh 版本兼容性
+
+**要求 dsh ≥ 0.1.7-rc.1**（已在 0.1.7-rc.1 实测通过）。
+
+- **`ctx.settings.register()` 已移除**（2026-09-24）：原 `ledger` settings namespace 并入插件 `Config`，可热改字段标 `.volatile()`；`inject` 去掉 `settings`。
+- **Typert strict codec 必须带 `create()` 工厂**（0.1.7 客户端校验）：`client.js` 与 `index.js` 的 result / payload codec 均已补 `create()`。
+
 ## 工作原理
 
 ```

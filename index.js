@@ -14,20 +14,23 @@ import { LedgerEngine } from "./lib/ledger-engine.mjs";
 
 export const name = "dsh-ledger";
 
-export const inject = ["typert", "settings", "connection", "webServer"];
+export const inject = ["typert", "connection", "webServer"];
 
-/** `ledger` settings namespace：账本根目录。 */
-const LedgerSchema = z.object({
-  beancountDir: z.string(),
+// 插件 config。2026-09-24 适配 dsh 0.1.7：ctx.settings.register() 已移除，
+// 原 `ledger` settings namespace 并入插件 Config；.volatile() 字段可在设置页热改，
+// 改动由 loader 提交进运行中的引用并广播 loader/volatile-update。
+export const Config = z.object({
+  /** 账本根目录。默认 ~/Beancount。 */
+  beancountDir: z.string().default(join(homedir(), "Beancount")).volatile(),
 });
 
 function parseObj() {
-  return {
-    parse(value) {
-      if (typeof value !== "object" || value === null) throw new Error("expected object");
-      return value;
-    },
+  // 0.1.7：typert strict codec 必须有 create() 工厂（gateway 走 codec.create().parse(v)）。
+  const parse = (value) => {
+    if (typeof value !== "object" || value === null) throw new Error("expected object");
+    return value;
   };
+  return { parse, create: () => ({ parse }) };
 }
 const getResultSchema = parseObj();
 const setPayloadSchema = parseObj();
@@ -45,7 +48,7 @@ const MANIFEST = {
       method: "getConfig",
       invocation: { kind: "direct" },
       parameters: [],
-      result: { mode: "strict", typeSymbol: "dsh-ledger#LedgerConfig", schema: getResultSchema },
+      result: { mode: "strict", typeSymbol: "dsh-ledger#LedgerConfig", schema: getResultSchema, create: () => getResultSchema },
     },
     {
       id: "dsh-ledger#ledger/setConfig",
@@ -54,9 +57,9 @@ const MANIFEST = {
       method: "setConfig",
       invocation: { kind: "direct" },
       parameters: [
-        { name: "payload", wire: "payload", source: "json", codec: { mode: "strict", typeSymbol: "dsh-ledger#SetPayload", schema: setPayloadSchema } },
+        { name: "payload", wire: "payload", source: "json", codec: { mode: "strict", typeSymbol: "dsh-ledger#SetPayload", schema: setPayloadSchema, create: () => setPayloadSchema } },
       ],
-      result: { mode: "strict", typeSymbol: "dsh-ledger#SetResult", schema: setResultSchema },
+      result: { mode: "strict", typeSymbol: "dsh-ledger#SetResult", schema: setResultSchema, create: () => setResultSchema },
     },
   ],
   model: { services: [], events: [], objects: [] },
@@ -93,11 +96,19 @@ export function apply(ctx, config) {
     error: (m) => { console.error(`[${ts()}] [lg:err] ${m}`); try { Logger?.error?.(m); } catch {} },
   };
 
-  const scope = ctx.settings.register("ledger", LedgerSchema, {
-    base: {
-      beancountDir: join(homedir(), "Beancount"),
+  // 0.1.7：配置即插件 Config 的 volatile 字段，这里适配出等价的 scope 外壳。
+  const scope = {
+    get: () => ({ beancountDir: config.beancountDir.get() }),
+    async update(patch) {
+      const editor = ctx.get("configEditor");
+      const entry = ctx.fiber?.entry;
+      if (!editor || entry === undefined) return;
+      await editor.edit(entry, (current) => ({ ...current, ...patch }));
     },
-  });
+    watch(cb) {
+      ctx.on("loader/volatile-update", () => { cb(scope.get()); });
+    },
+  };
 
   const engine = new LedgerEngine({
     beancountDir: scope.get()?.beancountDir,
