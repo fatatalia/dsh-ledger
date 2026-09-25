@@ -1,9 +1,16 @@
 /**
  * dsh-ledger — client 半部分（浏览器 bundle）
  *
- * 在会话页面注册 "记账" Tab（conversation.view 槽位，同 dsh-dreaming 模式）：
- * 只读仪表盘——本月收支总览卡、资产概览、支出分类占比、最近交易。
- * 数据经 connection.rpc 走 "/dsh-ledger" 通道，进入 Tab 时自动刷新一次，
+ * 2026-09-25 改版：从会话页 Tab（conversation.view）升级为**左侧菜单独立页面**，
+ * 与 dsh-dreaming 同一套做法（对齐官方 @deepseek-ai/dsh-client-ui-schedule）：
+ *   ① main 槽位          —— 页面本体（用 key 关联）
+ *   ② sidebar.panellist  —— 左侧菜单项（用 id 关联；与 ① 同一个 id "ledger"）
+ * 点击左侧「记账」→ main 区域切换到本页面，不再是会话内的一个 Tab。
+ *
+ * 页面内容：只读仪表盘——本月收支总览卡、资产概览、支出分类占比、最近交易。
+ * 保留宽布局（页面容器 maxWidth 1600，仪表盘需要横向空间）。
+ * 配置项（账本目录等）仍留在 Settings → 记账，**不搬进页面**。
+ * 数据经 connection.rpc 走 "/dsh-ledger" 通道，进入页面时自动刷新一次，
  * 支持手工刷新。不提供记账操作（只读），Fava 保留做深度分析。
  */
 window.__ModuleLoader__.load({
@@ -67,6 +74,32 @@ window.__ModuleLoader__.load({
     const txMeta = { color: "var(--dsw-alias-label-tertiary)", fontSize: 11, flex: "0 0 70px" };
     const empty = { color: "var(--dsw-alias-label-tertiary)", padding: "24px 0", textAlign: "center" };
 
+    // ── 页面级布局（独立页面用；仪表盘保留 1600 宽布局）─────────────────────
+    const page = {
+      width: "100%",
+      minWidth: 0,
+      height: "100%",
+      minHeight: 0,
+      color: "var(--dsw-alias-label-primary)",
+      background: "var(--dsw-alias-bg-base)",
+      fontSize: 14,
+      lineHeight: 1.6,
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+    };
+    const pageScroll = { flex: 1, minHeight: 0, overflow: "auto", scrollbarGutter: "stable" };
+    const pageContent = { width: "100%", maxWidth: 1600, margin: "0 auto", padding: "0 20px 40px" };
+    const pageHeading = {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 16,
+      paddingTop: 24,
+      flexWrap: "wrap",
+    };
+    const h1 = { margin: 0, fontSize: 20, fontWeight: 500, lineHeight: "28px", flex: "none" };
+
     function LedgerView({ runtime }) {
       const [data, setData] = React.useState(null);
       const [error, setError] = React.useState("");
@@ -86,10 +119,14 @@ window.__ModuleLoader__.load({
         return () => { current = false; };
       }, [runtime, tick]);
 
-      if (error && !data) return S.jsx("div", { style: { maxWidth: 760, padding: "24px 20px" }, children: [
-        S.jsx("p", { style: { color: "var(--dsw-alias-state-error-primary)" }, children: `加载失败：${error}` }),
-        S.jsx("button", { onClick: () => setTick((t) => t + 1), style: { marginTop: 8, padding: "5px 12px", borderRadius: 8, cursor: "pointer" }, children: "重试" }),
-      ] });
+      if (error && !data) return S.jsx("div", { style: page, children:
+        S.jsx("div", { style: pageScroll, children:
+          S.jsx("div", { style: pageContent, children: [
+            S.jsx("p", { style: { color: "var(--dsw-alias-state-error-primary)" }, children: `加载失败：${error}` }),
+            S.jsx("button", { onClick: () => setTick((t) => t + 1), style: { marginTop: 8, padding: "5px 12px", borderRadius: 8, cursor: "pointer" }, children: "重试" }),
+          ] }),
+        }),
+      });
 
       const monthly = data?.monthly;
       const summary = data?.summary;
@@ -98,20 +135,26 @@ window.__ModuleLoader__.load({
       const topCategories = (monthly?.categories || []).slice(0, 5);
       const restAmount = monthly ? monthly.categories.slice(5).reduce((s, c) => s + c.amount, 0) : 0;
 
-      return S.jsxs("div", {
-        style: { width: "100%", maxWidth: 1600, margin: "0 auto", padding: "24px 20px", fontFamily: "var(--dsw-font-family,system-ui)", color: "var(--dsw-alias-label-primary)" },
-        children: [
-          S.jsxs("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }, children: [
-            S.jsx("span", { style: { fontSize: 17, fontWeight: 700 }, children: "📒 记账" }),
-            S.jsx("span", { style: { color: "var(--dsw-alias-label-tertiary)", fontSize: 12 }, children: data ? `${data.month} 月 · 更新于 ${new Date(data.fetchedAt).toLocaleTimeString("zh-CN")}` : "" }),
-            S.jsx("button", {
-              type: "button",
-              disabled: busy,
-              onClick: () => setTick((t) => t + 1),
-              style: { marginLeft: "auto", padding: "6px 14px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-alias-bg-base)", cursor: busy ? "default" : "pointer", fontWeight: 500 },
-              children: busy ? "刷新中…" : "刷新",
-            }),
-          ]}),
+      return S.jsx("div", {
+        style: page,
+        children: S.jsx("div", {
+          style: pageScroll,
+          children: S.jsx("div", {
+            style: pageContent,
+            children: S.jsxs("div", {
+              children: [
+                // 页面标题栏（独立页面的页头）
+                S.jsxs("div", { style: pageHeading, children: [
+                  S.jsx("h1", { style: h1, children: "📒 记账" }),
+                  S.jsx("span", { style: { color: "var(--dsw-alias-label-tertiary)", fontSize: 12, flex: "none" }, children: data ? `${data.month} 月 · 更新于 ${new Date(data.fetchedAt).toLocaleTimeString("zh-CN")}` : "" }),
+                  S.jsx("button", {
+                    type: "button",
+                    disabled: busy,
+                    onClick: () => setTick((t) => t + 1),
+                    style: { marginLeft: "auto", padding: "6px 14px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2)", background: "var(--dsw-alias-bg-base)", cursor: busy ? "default" : "pointer", fontWeight: 500 },
+                    children: busy ? "刷新中…" : "刷新",
+                  }),
+                ]}),
           error ? S.jsx("p", { style: { color: "var(--dsw-alias-state-error-primary)", marginBottom: 12, fontSize: 13 }, children: error }) : null,
           !data ? S.jsx("p", { style: empty, children: "加载中…" }) : S.jsxs("div", { style: { display: "flex", gap: 12, alignItems: "flex-start" }, children: [
 
@@ -232,8 +275,11 @@ window.__ModuleLoader__.load({
             ] }),
 
             !monthly ? S.jsx("p", { style: empty, children: "本月暂无账本数据。" }) : null,
-          ] }),
-        ],
+              ] }),
+              ],
+            }),
+          }),
+        }),
       });
     }
 
@@ -247,6 +293,38 @@ window.__ModuleLoader__.load({
         { id: "dsh-ledger#ledger/setConfig", service: "ledger", namespace: "ledger", method: "setConfig", invocation: { kind: "direct" }, parameters: [{ name: "payload", wire: "payload", source: "json", codec: codec("dsh-ledger#SetPayload") }], result: codec("dsh-ledger#SetResult") },
       ],
     };
+
+    /**
+     * 左侧菜单项图标：账本。
+     *
+     * ⚠️ 对齐官方 TaskManagerIcon 的约束：返回的 <svg> 必须是侧边栏行的
+     * **直接图形子元素**，不要再套一层 inline wrapper —— 套 wrapper 会让它成为
+     * 行内盒的基线、把图标顶到标签上方。侧边栏自己负责无障碍导航标签，
+     * 这里只负责画图形。
+     */
+    function LedgerIcon(props) {
+      const size = (props && props.size) || 16;
+      return S.jsx("svg", {
+        width: size,
+        height: size,
+        viewBox: "0 0 16 16",
+        fill: "none",
+        xmlns: "http://www.w3.org/2000/svg",
+        "aria-hidden": "true",
+        focusable: "false",
+        children: S.jsxs(React.Fragment, { children: [
+          // 账本外框
+          S.jsx("rect", {
+            x: 2.4, y: 1.6, width: 11.2, height: 12.8, rx: 1.4,
+            stroke: "currentColor", strokeWidth: 1.4, fill: "none",
+          }),
+          // 书脊
+          S.jsx("path", { d: "M6 1.6v12.8", stroke: "currentColor", strokeWidth: 1.4 }),
+          // 两行账目
+          S.jsx("path", { d: "M8.2 5.2h3.4M8.2 8h3.4", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round" }),
+        ] }),
+      });
+    }
 
     /** 设置页：记账配置（账本目录）。 */
     function LedgerSettingsSection(props) {
@@ -293,26 +371,37 @@ window.__ModuleLoader__.load({
     const inject = ["slots", "connection", "remote"];
 
     function apply(ctx) {
-      // 记账 Tab（conversation.view，与梦境并排）。
-      const runtimes = new Map();
-      ctx.effect(() => () => { runtimes.clear(); }, "dsh-ledger: runtimes");
-      ctx.slots.inject("conversation.view", () =>
+      // ── 左侧菜单独立页面（2026-09-25 改版）───────────────────────────────
+      // 与 dsh-dreaming 同一套双注册（对齐官方 @deepseek-ai/dsh-client-ui-schedule）：
+      //   ① main 槽位         —— 页面本体，用 key 关联；
+      //   ② sidebar.panellist —— 左侧菜单项，用 id 关联。
+      // 两处共用同一个 id "ledger"（页面写 key、菜单写 id），点菜单即切到该页面。
+      // 注：原 conversation.view Tab 已移除 —— 同一功能不再重复占用会话页。
+      // runtime 不再按 sessionId 缓存：createLedgerRuntime 本就不使用 sessionId
+      // （RPC 通道 "/dsh-ledger" 与会话无关），独立页面也没有会话上下文。
+      const runtime = createLedgerRuntime(ctx.connection.rpc);
+      const PAGE_ID = "ledger";
+
+      ctx.slots.inject("main", () =>
         ctx.slots.register(
           {
-            name: "conversation.view",
-            id: "ledger",
-            order: 51,
-            label: () => "记账",
-            inject: (sessionId) => {
-              let runtime = runtimes.get(sessionId);
-              if (runtime === void 0) {
-                runtime = createLedgerRuntime(ctx.connection.rpc, sessionId);
-                runtimes.set(sessionId, runtime);
-              }
-              return { runtime };
-            },
+            name: "main",
+            key: PAGE_ID,
+            inject: () => ({ runtime }),
           },
           LedgerView,
+        ),
+      );
+
+      ctx.slots.inject("sidebar.panellist", () =>
+        ctx.slots.register(
+          {
+            name: "sidebar.panellist",
+            id: PAGE_ID,
+            order: 31,
+            label: () => "记账",
+          },
+          LedgerIcon,
         ),
       );
 
