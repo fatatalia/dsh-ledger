@@ -2,3 +2,9 @@ node_modules/
 *.log
 .DS_Store
 __pycache__/
+# ── 统一补全（2026-10-18）──
+*.bak-*
+.backup-*/
+*.orig
+*.tmp
+*.swp
